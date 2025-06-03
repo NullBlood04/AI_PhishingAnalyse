@@ -1,7 +1,6 @@
 import streamlit as st
 from langchain_openai import AzureChatOpenAI
 from langchain.schema import SystemMessage, HumanMessage
-import json
 
 # Load from secrets
 AZURE_OPENAI_API_KEY = st.secrets["AZURE_OPENAI_API_KEY"]
@@ -55,3 +54,5 @@ Email:
 
             except Exception as e:
                 st.error(f"Something went wrong: {e}")
+
+
