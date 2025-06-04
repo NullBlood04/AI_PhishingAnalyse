@@ -20,7 +20,7 @@ chat = AzureChatOpenAI(
 
 # Streamlit GUI
 st.set_page_config(page_title="Phishing Email Detector", layout="centered")
-st.title("📧 Phishing Email Detector")
+st.title("Phishing Email Detector")
 st.markdown("Paste the email content below and get a plain-text classification.")
 
 email_content = st.text_area("Email Content", height=300, placeholder="Paste email body here...")
@@ -44,6 +44,8 @@ Respond in plane text format however it should look python dictionary like this:
 "Reason": brief explanation
 }}
                                  
+I need only the answer and don't add any prefixes
+                                 
 Email:
 {email_content}
 """)
@@ -52,7 +54,7 @@ Email:
                 response = chat(messages)
                 content = response.content
 
-                st.subheader("🧠 AI Analysis Result")
+                st.subheader("AI Analysis Result")
                 try:
                     result = json.loads(str(content))
                     if result["Result"].lower() == "phishing":
