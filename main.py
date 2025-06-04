@@ -1,6 +1,7 @@
 import streamlit as st
 from langchain_openai import AzureChatOpenAI
 from langchain.schema import SystemMessage, HumanMessage
+import json
 
 # Load from secrets
 AZURE_OPENAI_API_KEY = st.secrets["AZURE_OPENAI_API_KEY"]
@@ -35,22 +36,37 @@ if st.button("Analyze Email"):
                     HumanMessage(content=f"""
 Analyze the following email and determine if it is a phishing attempt.
 
-Respond in plain text like this:
-
-Result: Phishing or Not Phishing  
-Confidence: high/medium/low  
-Reason: brief explanation
-
+Respond in plane text format however it should look python dictionary like this:
+                                 
+{{
+"Result": Phishing or Not Phishing  
+"Confidence": high/medium/low  
+"Reason": brief explanation
+}}
+                                 
 Email:
 {email_content}
 """)
                 ]
 
                 response = chat(messages)
-                plain_text = response.content
+                content = response.content
 
                 st.subheader("🧠 AI Analysis Result")
-                st.text(plain_text)
+                try:
+                    result = json.loads(str(content))
+                    if result["Result"].lower() == "phishing":
+                        st.badge(result["Result"], color="red")
+                    else:
+                        st.badge(result["Result"])
+
+                    st.badge(result["Confidence"])
+                    st.markdown(result["Reason"])
+
+                except Exception as e:
+                    st.error(f"Failed to parse LLM response: {e}")
+                    st.text("Raw LLM output:")
+                    st.text(content or "No content.")
 
             except Exception as e:
                 st.error(f"Something went wrong: {e}")
