@@ -126,14 +126,13 @@ with tab_imageInput:
                     st.code(ocr_text, language="text")
 
                     # Step 2: (Optional) Add BLIP description
-                    # caption = generate_caption(image)
-                    # combined_input = f"Visual Description: {caption}\nExtracted Email Text:\n{ocr_text}"
+                    caption = generate_caption(image)
+                    combined_input = f"Visual Description: {caption}\nExtracted Email Text:\n{ocr_text}"
 
                     # Step 3: Analyze
                     messages = [
                         SystemMessage(content="You are a cybersecurity expert trained to detect phishing emails."),
-                        HumanMessage(content=query + f"\nExtracted Email Text:\n{ocr_text}")
-                        # OR if combining: HumanMessage(content=query + combined_input)
+                        HumanMessage(content=query + combined_input)
                     ]
                     response = chat(messages)
                     parse_ai_response(response.content)
