@@ -1,13 +1,12 @@
-from langchain_openai import AzureChatOpenAI
+from transformers import BlipProcessor, BlipForConditionalGeneration
 from langchain.schema import SystemMessage, HumanMessage
+from langchain_openai import AzureChatOpenAI
 import streamlit as st
 from PIL import Image
-import pytesseract
-import json
+import numpy as np
+import easyocr
 import torch
-
-# Optional: For BLIP captioning (if you want both OCR + visual context)
-from transformers import BlipProcessor, BlipForConditionalGeneration
+import json
 
 # Load from secrets
 AZURE_OPENAI_API_KEY = st.secrets["AZURE_OPENAI_API_KEY"]
@@ -27,7 +26,7 @@ chat = AzureChatOpenAI(
 # Prompt
 query = """
 Analyze the following email and determine if it is a phishing attempt.
-
+Take into consideration there my be spelling mistakes made by the text extractor, so give your output accordingly
 Respond in plain text format, however, it should look like a Python dictionary like this:
 
 {
@@ -38,6 +37,17 @@ Respond in plain text format, however, it should look like a Python dictionary l
 
 I need only the answer and don't add any prefixes.
 """
+
+system_message = """
+You are a cybersecurity expert. Your only task is to evaluate emails and determine if they are phishing attempts.
+Respond ONLY with a valid JSON object with these keys:
+- "Result": "Phishing" or "Not Phishing"
+- "Confidence": "high", "medium", or "low"
+- "Reason": A short sentence explaining your decision
+
+Do not add any explanations, formatting, or extra text outside the JSON.
+"""
+
 
 # Function to parse and display result
 def parse_ai_response(content):
@@ -50,7 +60,14 @@ def parse_ai_response(content):
         else:
             st.markdown(f"**Result:** :green-badge[{result['Result']}]")
 
-        st.markdown(f"**Confidence:** {result['Confidence']}")
+        confidence = result["Confidence"].lower()
+        if confidence == "high":
+            st.markdown("**Confidence:** :green-badge[High]")
+        elif confidence == "medium":
+            st.markdown("**Confidence:** :orange-badge[Medium]")
+        else:
+            st.markdown("**Confidence:** :red-badge[Low]")
+
         st.markdown(f"**Reason:** {result['Reason']}")
 
     except Exception as e:
@@ -62,7 +79,7 @@ def parse_ai_response(content):
 def analyze_email(email_content):
     try:
         messages = [
-            SystemMessage(content="You are a cybersecurity expert trained to detect phishing emails."),
+            SystemMessage(content=system_message),
             HumanMessage(content=query + f"Email:\n{email_content}")
         ]
         response = chat(messages)
@@ -72,10 +89,15 @@ def analyze_email(email_content):
         st.error(f"Something went wrong: {e}")
 
 # OCR Function
-def extract_text_from_image(image: Image.Image) -> str:
-    return pytesseract.image_to_string(image)
+reader = easyocr.Reader(['en'])
 
-# Optional: BLIP Captioning (can be used along with OCR)
+def extract_text_ai_ocr(image: Image.Image) -> str:
+    image_np = np.array(image)
+
+    results = reader.readtext(image_np, detail=0)  # detail=0 returns just the text
+    return "\n".join(results) # type: ignore
+
+# BLIP Captioning (To be used along with OCR)
 @st.cache_resource
 def load_blip_model():
     processor = BlipProcessor.from_pretrained("Salesforce/blip-image-captioning-base")
@@ -110,7 +132,6 @@ with tab_textInput:
 
 # IMAGE ANALYSIS TAB
 with tab_imageInput:
-    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
     imageUpload = st.file_uploader("Choose image", type=["jpg", "png", "jpeg"])
 
     if imageUpload:
@@ -121,17 +142,17 @@ with tab_imageInput:
             with st.spinner("Extracting text and analyzing..."):
                 try:
                     # Step 1: OCR
-                    ocr_text = extract_text_from_image(image)
+                    ocr_text = extract_text_ai_ocr(image)
                     st.markdown("**Extracted Text from Image:**")
                     st.code(ocr_text, language="text")
 
-                    # Step 2: (Optional) Add BLIP description
+                    # Step 2: Add BLIP description
                     caption = generate_caption(image)
                     combined_input = f"Visual Description: {caption}\nExtracted Email Text:\n{ocr_text}"
 
                     # Step 3: Analyze
                     messages = [
-                        SystemMessage(content="You are a cybersecurity expert trained to detect phishing emails."),
+                        SystemMessage(content=system_message),
                         HumanMessage(content=query + combined_input)
                     ]
                     response = chat(messages)
